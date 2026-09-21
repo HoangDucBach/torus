@@ -13,15 +13,23 @@ eventual target; see [Deploying](#deploying).
 | Contract | Address |
 |---|---|
 | `TorusVault` (torUSDC) | [`0xF87e393cdC523E69dE27e2E992225136d654273b`](https://explorer.testnet.arc.io/address/0xF87e393cdC523E69dE27e2E992225136d654273b) |
-| `TorusPaymaster` | [`0x497B7b6aAcB8a3372D569740c92ED53F75ED670B`](https://explorer.testnet.arc.io/address/0x497B7b6aAcB8a3372D569740c92ED53F75ED670B) |
+| `TorusPaymaster` (EntryPoint v0.7) | [`0x497B7b6aAcB8a3372D569740c92ED53F75ED670B`](https://explorer.testnet.arc.io/address/0x497B7b6aAcB8a3372D569740c92ED53F75ED670B) |
+| `TorusPaymaster` (EntryPoint v0.8, EIP-7702) | [`0xA49e84E73aE841DAc8A80CfD8fB11BD09a8B17AC`](https://explorer.testnet.arc.io/address/0xA49e84E73aE841DAc8A80CfD8fB11BD09a8B17AC) |
 | `MockRWAStrategy` | [`0x575bFa3763153075327E32eAf00C9292560A4C72`](https://explorer.testnet.arc.io/address/0x575bFa3763153075327E32eAf00C9292560A4C72) |
 | `MockRWAOracle` | [`0x408009125c85E10242372dFa0dB9364b37092159`](https://explorer.testnet.arc.io/address/0x408009125c85E10242372dFa0dB9364b37092159) |
 
-All four are verified (source visible on the explorer). Live proof of the core claim — a smart
-account with **zero native USDC** paying gas entirely out of its `torUSDC` balance, through the
-real, already-deployed Arc EntryPoint v0.7, with no bundler-as-a-service involved (submitted
-directly to `handleOps`):
-[`0xa37737ff3b4e2ffa48e2532aeac11cabb1c806fe9299826539fafa3472bde363`](https://explorer.testnet.arc.io/tx/0xa37737ff3b4e2ffa48e2532aeac11cabb1c806fe9299826539fafa3472bde363).
+All five are verified (source visible on the explorer). `vault.gasSpender()` currently points at
+the v0.8 paymaster, so it — not the v0.7 one — gets the implicit-max-allowance fast path.
+
+Two live, on-chain proofs of the core claim — an account with **zero native USDC** paying gas
+entirely out of its `torUSDC` balance:
+
+- **Deployed smart account, EntryPoint v0.7**, no bundler-as-a-service involved (submitted
+  directly to `handleOps`):
+  [`0xa37737ff...2bde363`](https://explorer.testnet.arc.io/tx/0xa37737ff3b4e2ffa48e2532aeac11cabb1c806fe9299826539fafa3472bde363)
+- **Unmodified EOA via EIP-7702, EntryPoint v0.8** — no separate smart-account contract ever
+  deployed for it (`test/integration/Eip7702Lifecycle.t.sol`, forked from this same live
+  deployment; passes as of this writing)
 
 ## How it works
 
@@ -162,6 +170,17 @@ bridge testnet USDC from Ethereum Sepolia into Arc Testnet via CCTP, so a new us
 looking for an Arc-specific faucet. App Kit itself has no wallet-connection UI or account
 abstraction of its own — it wraps whatever EIP-1193 provider the connected wagmi connector
 already exposes (`createViemAdapterFromProvider`).
+
+**Gasless via EIP-7702** — `useEip7702GaslessCall` lets a user's own EOA temporarily act as a
+smart account (no separate address, no separate deployed contract) and pay gas out of its
+torUSDC, using the v0.8 `TorusPaymaster`. Standard browser wallets don't support this yet:
+MetaMask has no RPC method for a dApp to request an EIP-7702 authorization signature from a
+regular injected account ([MetaMask/smart-accounts-kit#247](https://github.com/MetaMask/smart-accounts-kit/issues/247)),
+so this flow runs through a [Privy](https://privy.io) embedded wallet instead, which signs its
+own key directly. Needs `NEXT_PUBLIC_PRIVY_APP_ID` and a bundler that supports Arc Testnet +
+EIP-7702 (e.g. Pimlico) via `NEXT_PUBLIC_BUNDLER_URL`; without them the card just says so. The
+underlying mechanism is proven independently of any bundler/wallet-support question in
+`contracts/test/integration/Eip7702Lifecycle.t.sol`.
 
 ```bash
 cd web
