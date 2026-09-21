@@ -23,20 +23,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-  // Privy's embedded wallet (needed for EIP-7702 authorization signing — see lib/wagmi.ts) is
-  // opt-in: without an App ID the app still works fully via a regular injected wallet, just
-  // without the "gasless via EIP-7702" demo. `@privy-io/wagmi`'s `WagmiProvider` syncs Privy's
-  // wallet state internally and throws when mounted without a `<PrivyProvider>` ancestor, so
-  // the *choice of provider component* — not just what wraps it — has to be conditional too.
-  if (!privyAppId) {
-    return (
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      </WagmiProvider>
-    );
-  }
-
-  return (
+  // QueryClientProvider must be the outermost data-layer provider: `@privy-io/wagmi`'s
+  // WagmiProvider calls wagmi/TanStack hooks in its own body (to sync Privy's wallet state),
+  // not just in its children, so QueryClient has to be available *above* it, not nested inside.
+  const wagmi = !privyAppId ? (
+    // Privy's embedded wallet (needed for EIP-7702 authorization signing — see lib/wagmi.ts) is
+    // opt-in: without an App ID the app still works fully via a regular injected wallet, just
+    // without the "gasless via EIP-7702" demo. `@privy-io/wagmi`'s WagmiProvider throws when
+    // mounted without a `<PrivyProvider>` ancestor, so the *provider component itself* — not
+    // just what wraps it — has to be chosen conditionally.
+    <WagmiProvider config={wagmiConfig}>{children}</WagmiProvider>
+  ) : (
     <PrivyProvider
       appId={privyAppId}
       config={{
@@ -45,9 +42,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         supportedChains: [arcTestnet],
       }}
     >
-      <PrivyWagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      </PrivyWagmiProvider>
+      <PrivyWagmiProvider config={wagmiConfig}>{children}</PrivyWagmiProvider>
     </PrivyProvider>
   );
+
+  return <QueryClientProvider client={queryClient}>{wagmi}</QueryClientProvider>;
 }
