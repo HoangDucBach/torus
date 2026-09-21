@@ -63,3 +63,25 @@ jobs:
       - name: Typecheck
         working-directory: server
         run: bun run typecheck
+
+  web:
+    name: Web (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: web
+        run: bun run typecheck
+
+      - name: Build
+        working-directory: web
+        run: bun run build

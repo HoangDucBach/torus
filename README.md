@@ -46,6 +46,7 @@ refuel(): redeem collected torUSDC → native USDC → top up EntryPoint deposit
 ```
 contracts/    Arc Foundry project — TorusVault, TorusPaymaster, mocks, tests, deploy scripts
 server/       Bun + Hono service — ERC-7677 paymaster RPC, /quote, /stats, keeper cron, e2e script
+web/          Next.js + HeroUI dashboard — connect wallet, bridge in, deposit, view stats
 ```
 
 ## Contracts (`contracts/`)
@@ -133,6 +134,40 @@ cp .env.example .env   # fill in ARC_NETWORK / DEPLOYMENT_FILE / KEEPER_PRIVATE_
 bun run start     # the API (paymaster + /quote + /stats)
 bun run keeper     # accrue → harvest → refuel loop, on KEEPER_INTERVAL_SECONDS
 bun run e2e        # full flow via a real bundler (needs BUNDLER_RPC_URL, see scripts/e2e.ts)
+```
+
+## Web dashboard (`web/`)
+
+Next.js 16 (App Router) + [HeroUI v3](https://heroui.com) for components (default theme, no
+custom CSS — layout only) + [wagmi](https://wagmi.sh)/viem for wallet connection and contract
+calls + TanStack Query as the base for every data hook.
+
+**Hook architecture** — every hook in `src/hooks/` returns one of two shapes, re-exported as-is
+from TanStack Query (`src/hooks/types.ts`):
+
+- Reads (`useProtocolStats`, `useQuote`, `useTorBalance`, `useNativeBalance`) return
+  `QueryHookResult<T>` — a plain `UseQueryResult`, so every component destructures
+  `{ data, isPending, error }` the same way regardless of whether the hook reads on-chain state
+  or Torus's own REST API.
+- Writes (`useDepositNative`, `useConnectWallet`, `useBridgeToArc`) return
+  `MutationHookResult<TVariables, TData>` — a plain `UseMutationResult`, so every component
+  calls `mutate(...)` and reads `{ isPending, error }` the same way.
+
+Query keys live in one place (`src/lib/queryKeys.ts`) so mutations can invalidate the right
+caches (e.g. a deposit invalidates the balance and stats queries) without ad-hoc key strings
+scattered across hooks.
+
+**Bridging in** — `useBridgeToArc` integrates [Circle's App Kit](https://docs.arc.io/app-kit) to
+bridge testnet USDC from Ethereum Sepolia into Arc Testnet via CCTP, so a new user isn't stuck
+looking for an Arc-specific faucet. App Kit itself has no wallet-connection UI or account
+abstraction of its own — it wraps whatever EIP-1193 provider the connected wagmi connector
+already exposes (`createViemAdapterFromProvider`).
+
+```bash
+cd web
+bun install
+cp .env.example .env.local   # NEXT_PUBLIC_SERVER_URL, defaults to the live testnet deployment
+bun run dev
 ```
 
 ## Security notes
