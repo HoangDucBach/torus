@@ -53,8 +53,9 @@ refuel(): redeem collected torUSDC → native USDC → top up EntryPoint deposit
 
 ```
 contracts/    Arc Foundry project — TorusVault, TorusPaymaster, mocks, tests, deploy scripts
-server/       Bun + Hono service — ERC-7677 paymaster RPC, /quote, /stats, keeper cron, e2e script
-web/          Next.js + HeroUI dashboard — connect wallet, bridge in, deposit, view stats
+server/       Bun + Hono service — ERC-7677 paymaster RPC, /quote, /stats, /position, keeper cron
+web/          Next.js + HeroUI dashboard — deposit, withdraw, real earnings, protocol stats
+examples/     Standalone integration demos for third-party protocols (see below)
 ```
 
 ## Contracts (`contracts/`)
@@ -148,16 +149,18 @@ bun run e2e        # full flow via a real bundler (needs BUNDLER_RPC_URL, see sc
 
 Next.js 16 (App Router) + [HeroUI v3](https://heroui.com) for components (default theme, no
 custom CSS — layout only) + [wagmi](https://wagmi.sh)/viem for wallet connection and contract
-calls + TanStack Query as the base for every data hook.
+calls + TanStack Query as the base for every data hook. This is the real product surface — a
+yield-bearing stablecoin dashboard, not a demo: connect a wallet, deposit native USDC, withdraw
+torUSDC back to USDC, and see real numbers throughout (no mocked stats or projected APY).
 
 **Hook architecture** — every hook in `src/hooks/` returns one of two shapes, re-exported as-is
 from TanStack Query (`src/hooks/types.ts`):
 
-- Reads (`useProtocolStats`, `useQuote`, `useTorBalance`, `useNativeBalance`) return
-  `QueryHookResult<T>` — a plain `UseQueryResult`, so every component destructures
+- Reads (`useProtocolStats`, `useQuote`, `useTorBalance`, `useNativeBalance`, `useEarnings`)
+  return `QueryHookResult<T>` — a plain `UseQueryResult`, so every component destructures
   `{ data, isPending, error }` the same way regardless of whether the hook reads on-chain state
   or Torus's own REST API.
-- Writes (`useDepositNative`, `useConnectWallet`, `useBridgeToArc`) return
+- Writes (`useDepositNative`, `useWithdraw`, `useConnectWallet`) return
   `MutationHookResult<TVariables, TData>` — a plain `UseMutationResult`, so every component
   calls `mutate(...)` and reads `{ isPending, error }` the same way.
 
@@ -165,22 +168,15 @@ Query keys live in one place (`src/lib/queryKeys.ts`) so mutations can invalidat
 caches (e.g. a deposit invalidates the balance and stats queries) without ad-hoc key strings
 scattered across hooks.
 
-**Bridging in** — `useBridgeToArc` integrates [Circle's App Kit](https://docs.arc.io/app-kit) to
-bridge testnet USDC from Ethereum Sepolia into Arc Testnet via CCTP, so a new user isn't stuck
-looking for an Arc-specific faucet. App Kit itself has no wallet-connection UI or account
-abstraction of its own — it wraps whatever EIP-1193 provider the connected wagmi connector
-already exposes (`createViemAdapterFromProvider`).
+**Real earnings, no APY estimate** — `useEarnings` combines an on-chain `previewRedeem` call
+(the account's torUSDC balance priced at the current share rate) with the server's `GET
+/position` endpoint, which aggregates the vault's own `Deposit`/`Withdraw` events per address
+into a net cost basis (`server/src/position.ts`). `earned = currentValue - (deposited -
+withdrawn)` — derived entirely from on-chain events, never projected.
 
-**Gasless via EIP-7702** — `useEip7702GaslessCall` lets a user's own EOA temporarily act as a
-smart account (no separate address, no separate deployed contract) and pay gas out of its
-torUSDC, using the v0.8 `TorusPaymaster`. Standard browser wallets don't support this yet:
-MetaMask has no RPC method for a dApp to request an EIP-7702 authorization signature from a
-regular injected account ([MetaMask/smart-accounts-kit#247](https://github.com/MetaMask/smart-accounts-kit/issues/247)),
-so this flow runs through a [Privy](https://privy.io) embedded wallet instead, which signs its
-own key directly. Needs `NEXT_PUBLIC_PRIVY_APP_ID` and a bundler that supports Arc Testnet +
-EIP-7702 (e.g. Pimlico) via `NEXT_PUBLIC_BUNDLER_URL`; without them the card just says so. The
-underlying mechanism is proven independently of any bundler/wallet-support question in
-`contracts/test/integration/Eip7702Lifecycle.t.sol`.
+**Protocol stats** include real gas-sponsored totals — `server/src/gasStats.ts` scans
+`UserOperationSponsored` events from both paymasters (chunked `eth_getLogs`, since public RPCs
+cap range size) and reports cumulative torUSDC charged and UserOperation count.
 
 ```bash
 cd web
@@ -188,6 +184,22 @@ bun install
 cp .env.example .env.local   # NEXT_PUBLIC_SERVER_URL, defaults to the live testnet deployment
 bun run dev
 ```
+
+## Integrating a third-party protocol (`examples/gasless-demo`)
+
+Torus's paymaster is meant to sponsor gas for accounts calling *any* contract, not just
+`TorusVault` — an account just needs a `torUSDC` balance. There is deliberately no dedicated SDK
+or API key for this: the entire integration surface is the server's public
+[ERC-7677](https://eips.ethereum.org/EIPS/eip-7677) `/paymaster` endpoint
+(`server/src/routes/paymaster.ts`), which any standard ERC-4337 tool already knows how to speak
+(`viem/account-abstraction`'s `createPaymasterClient`, `permissionless.js`, etc.).
+
+`examples/gasless-demo` proves this end-to-end with a contract that has zero knowledge of
+Torus — `ExampleCounter.sol`, deployed separately on Arc Testnet — called gaslessly from a plain
+EOA via EIP-7702, sponsored entirely through Torus's paymaster. See
+[`examples/gasless-demo/README.md`](examples/gasless-demo/README.md). This is also where the
+"Gasless via EIP-7702" flow that used to live on the main dashboard moved to, since it's a proof
+for integrators, not a feature of the YBS product itself.
 
 ## Security notes
 
