@@ -21,6 +21,10 @@ export type Deployment = {
   // separate deployed contract, so it must use v0.8 — see contracts/src/TorusPaymaster.sol).
   entryPointV08?: Address;
   paymasterV08?: Address;
+  // The block this deployment was broadcast in — lets gasStats.ts scope `eth_getLogs` scans to
+  // blocks that could actually contain its events, instead of scanning from genesis (rejected by
+  // public RPCs once history is pruned).
+  deployedAtBlock?: number;
 };
 
 const network = (process.env.ARC_NETWORK === "mainnet" ? "mainnet" : "testnet") as

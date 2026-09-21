@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { publicClient } from "../clients.ts";
 import { addresses, entryPointAbi, paymasterAbi, strategyAbi, vaultAbi } from "../contracts.ts";
+import { getGasSponsoredStats } from "../gasStats.ts";
 import { getTokenPerNative, nativeCostToTorUsdc } from "../pricing.ts";
 
 export const apiRoute = new Hono();
@@ -48,15 +49,17 @@ apiRoute.get("/stats", async (c) => {
       }),
     ]);
 
-  const paymasterV08Deposit =
+  const [paymasterV08Deposit, gasSponsored] = await Promise.all([
     addresses.paymasterV08 && addresses.entryPointV08
-      ? await publicClient.readContract({
+      ? publicClient.readContract({
           address: addresses.entryPointV08,
           abi: entryPointAbi,
           functionName: "balanceOf",
           args: [addresses.paymasterV08],
         })
-      : undefined;
+      : Promise.resolve(undefined),
+    getGasSponsoredStats(),
+  ]);
 
   return c.json({
     chainId: (await publicClient.getChainId()).toString(),
@@ -73,6 +76,12 @@ apiRoute.get("/stats", async (c) => {
       reserve: strategyReserve.toString(),
     },
     paymasterEntryPointDeposit: paymasterDeposit.toString(),
+    // Real, on-chain-derived totals — summed from every UserOperationSponsored event either
+    // paymaster has emitted (see gasStats.ts). Not a getter on any single contract.
+    gasSponsored: {
+      totalTorUsdcCharged: gasSponsored.totalTorUsdcCharged.toString(),
+      userOperationCount: gasSponsored.userOperationCount,
+    },
     // EIP-7702 support (see contracts/src/TorusPaymaster.sol) — an EOA delegated to
     // Simple7702Account has no separate deployed contract, so it must use EntryPoint v0.8.
     eip7702: addresses.paymasterV08

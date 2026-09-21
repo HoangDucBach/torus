@@ -94,7 +94,11 @@ contract Deploy is Script {
         vm.serializeAddress(json, "vault", vault);
         vm.serializeAddress(json, "treasury", treasury);
         vm.serializeAddress(json, "admin", admin);
-        string memory finalJson = vm.serializeAddress(json, "paymaster", paymaster);
+        vm.serializeAddress(json, "paymaster", paymaster);
+        // Lets off-chain services (server/src/gasStats.ts) scope `eth_getLogs` scans to blocks
+        // that could actually contain this deployment's events, instead of scanning from genesis
+        // (which public RPCs reject once history is pruned) or guessing a start block.
+        string memory finalJson = vm.serializeUint(json, "deployedAtBlock", block.number);
 
         string memory path = string.concat("deployments/", vm.toString(block.chainid), ".json");
         vm.writeJson(finalJson, path);
