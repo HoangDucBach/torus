@@ -2,16 +2,10 @@ import { parseAbiItem, type Address } from "viem";
 import { addresses } from "./contracts.ts";
 import { scanLogs } from "./logScanner.ts";
 
-/**
- * Real cost-basis for one account, derived from the vault's own standard ERC-4626 `Deposit`/
- * `Withdraw` events (emitted for both `deposit()` and `depositNative()` — the native path calls
- * the same internal `_deposit`). There's no getter for "how much has this address ever put in",
- * so — like gasStats.ts — it has to be aggregated from logs.
- */
+// No getter for "how much has this address ever put in" — aggregated from the vault's own
+// Deposit/Withdraw events instead (like gasStats.ts).
 export type PositionCostBasis = {
-  /** Total USDC (6 decimals) this address has ever deposited, across every deposit. */
   depositedTotal: bigint;
-  /** Total USDC (6 decimals) this address has ever withdrawn, across every withdrawal. */
   withdrawnTotal: bigint;
 };
 

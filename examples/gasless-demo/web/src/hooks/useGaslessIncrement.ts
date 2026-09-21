@@ -22,13 +22,8 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * The whole point of this example: ExampleCounter is a completely unrelated third-party
- * contract — it has no idea Torus exists. This hook proves that ANY contract call from ANY
- * EOA (via EIP-7702, no separate smart-account deployment) can be sponsored purely by pointing
- * a standard ERC-4337 bundler client at Torus's `/paymaster` endpoint (ERC-7677). That endpoint
- * is the entire integration surface — nothing else from Torus is required.
- */
+// ExampleCounter has no idea Torus exists — this proves any EOA can sponsor a call to it via
+// EIP-7702 by pointing a standard ERC-4337 bundler client at Torus's /paymaster endpoint.
 export function useGaslessIncrement() {
   const { signAuthorization } = useSign7702Authorization();
   const { wallets } = useWallets();

@@ -8,13 +8,7 @@ import { getTokenPerNative, nativeCostToTorUsdc } from "../pricing.ts";
 
 export const apiRoute = new Hono();
 
-/**
- * GET /position?address=0x...
- * Real cost basis for one account — total USDC ever deposited/withdrawn, derived from the
- * vault's own Deposit/Withdraw events (see position.ts). Paired with the account's current
- * torUSDC balance (read directly on-chain by the caller), this is enough to compute real
- * earnings: `previewRedeem(balance) - (depositedTotal - withdrawnTotal)`.
- */
+/** Cost basis for one account, derived from the vault's own Deposit/Withdraw events. */
 apiRoute.get("/position", async (c) => {
   const address = c.req.query("address");
   if (!address || !isAddress(address)) {
@@ -29,12 +23,7 @@ apiRoute.get("/position", async (c) => {
   });
 });
 
-/**
- * GET /quote?gas=<uint>&maxFeePerGas=<wei>
- * Estimated torUSDC a user operation of `gas` gas units at `maxFeePerGas` would cost, using the
- * same pricing {TorusPaymaster} applies on-chain. Useful for wallets that want to show a price
- * before submitting, without needing their own EntryPoint gas-estimation round trip.
- */
+/** Estimated torUSDC cost for a UserOperation, using the same pricing TorusPaymaster applies on-chain. */
 apiRoute.get("/quote", async (c) => {
   const gas = c.req.query("gas");
   const maxFeePerGas = c.req.query("maxFeePerGas");
@@ -53,7 +42,6 @@ apiRoute.get("/quote", async (c) => {
   });
 });
 
-/** GET /stats — protocol-wide numbers for a dashboard or health check. */
 apiRoute.get("/stats", async (c) => {
   const [totalAssets, totalSupply, rate, performanceFeeBps, strategyAssets, strategyReserve, spreadBps, paymasterDeposit] =
     await Promise.all([
@@ -99,14 +87,10 @@ apiRoute.get("/stats", async (c) => {
       reserve: strategyReserve.toString(),
     },
     paymasterEntryPointDeposit: paymasterDeposit.toString(),
-    // Real, on-chain-derived totals — summed from every UserOperationSponsored event either
-    // paymaster has emitted (see gasStats.ts). Not a getter on any single contract.
     gasSponsored: {
       totalTorUsdcCharged: gasSponsored.totalTorUsdcCharged.toString(),
       userOperationCount: gasSponsored.userOperationCount,
     },
-    // EIP-7702 support (see contracts/src/TorusPaymaster.sol) — an EOA delegated to
-    // Simple7702Account has no separate deployed contract, so it must use EntryPoint v0.8.
     eip7702: addresses.paymasterV08
       ? {
           entryPoint: addresses.entryPointV08,

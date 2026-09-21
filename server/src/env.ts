@@ -16,14 +16,11 @@ export type Deployment = {
   paymaster: Address; // targets `entryPoint` (v0.7)
   treasury: Address;
   admin: Address;
-  // Written by script/DeployPaymaster.s.sol: a second paymaster targeting EntryPoint v0.8,
-  // required for EIP-7702 accounts (an EOA temporarily delegated to Simple7702Account has no
-  // separate deployed contract, so it must use v0.8 — see contracts/src/TorusPaymaster.sol).
+  // Second paymaster targeting EntryPoint v0.8, required for EIP-7702 accounts.
   entryPointV08?: Address;
   paymasterV08?: Address;
-  // The block this deployment was broadcast in — lets gasStats.ts scope `eth_getLogs` scans to
-  // blocks that could actually contain its events, instead of scanning from genesis (rejected by
-  // public RPCs once history is pruned).
+  // Lets gasStats.ts/position.ts scope eth_getLogs scans instead of starting from genesis
+  // (rejected by public RPCs once history is pruned).
   deployedAtBlock?: number;
 };
 
@@ -62,5 +59,4 @@ export const env = {
   paymasterMinDepositWei: BigInt(process.env.PAYMASTER_MIN_DEPOSIT_WEI ?? "1000000000000000000"),
 };
 
-// Re-exported for convenience so callers don't need to import from ./chain.ts separately.
 export { arcMainnet, arcTestnet };

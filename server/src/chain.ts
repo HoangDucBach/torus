@@ -1,12 +1,7 @@
 import { defineChain } from "viem";
 
-/**
- * Arc network definitions, pointed at the RPC/explorer endpoints documented at
- * docs.arc.io/arc/references/connect-to-arc. Defined locally (rather than trusting viem's
- * bundled `arc`/`arcTestnet` chains) since those currently point at a different RPC domain
- * (`arc.network` vs. the `arc.io` endpoints Circle's own docs and this repo's Foundry config
- * use) — verified working against `rpc.testnet.arc.io` throughout this project.
- */
+// Defined locally rather than using viem's bundled arc/arcTestnet chains — those point at
+// arc.network, not the arc.io endpoints Circle's docs and this repo's Foundry config use.
 export const arcTestnet = defineChain({
   id: 5_042_002,
   name: "Arc Testnet",

@@ -1,10 +1,6 @@
 import { defineChain } from "viem";
 
-/**
- * Arc Testnet — mirrors the main Torus dashboard's chain def (web/src/lib/chain.ts) and
- * contracts/foundry.toml. Kept here too so this example stands alone and can be copy-pasted by
- * a third-party integrator without pulling in the rest of this monorepo.
- */
+// Duplicated from web/src/lib/chain.ts so this example stands alone and can be copy-pasted.
 export const arcTestnet = defineChain({
   id: 5_042_002,
   name: "Arc Testnet",

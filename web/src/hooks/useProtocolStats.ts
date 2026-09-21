@@ -20,7 +20,6 @@ export type ProtocolStats = {
   gasSponsored: { totalTorUsdcCharged: string; userOperationCount: number };
 };
 
-/** Reads Torus's protocol-wide numbers from the server's `GET /stats` endpoint. */
 export function useProtocolStats(): QueryHookResult<ProtocolStats> {
   return useQuery({
     queryKey: queryKeys.protocolStats,

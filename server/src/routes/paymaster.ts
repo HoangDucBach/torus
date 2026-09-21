@@ -3,26 +3,13 @@ import { numberToHex, type Address } from "viem";
 import { paymasterForEntryPoint } from "../contracts.ts";
 
 /**
- * ERC-7677 (`pm_*`) paymaster RPC. Any AA SDK that speaks this standard (viem's
- * `paymasterActions`, permissionless.js's `createPaymasterClient`, etc.) can point at this
- * single endpoint and use Torus as a paymaster with zero Torus-specific integration code.
- *
- * Torus needs neither a signature scheme nor per-request state: {TorusPaymaster-_fetchDetails}
- * prices every operation purely from the vault's own exchange rate, so `paymasterData` is
- * always empty and the two ERC-7677 methods return practically the same payload — the only
- * difference upstream is *when* each is called (stub data during gas estimation, final data
- * once the account has settled its gas limits).
- *
- * Torus runs one paymaster per EntryPoint version (v0.7 for deployed smart accounts, v0.8 for
- * EIP-7702 accounts — see `contracts.ts`), so every response is resolved from the `entryPoint`
- * the caller passes in `params[1]`, per the ERC-7677 request shape
- * `[userOp, entryPoint, chainId, context?]`.
+ * ERC-7677 (`pm_*`) paymaster RPC. Pricing comes from the vault's own exchange rate, so there's
+ * no signature or per-request state — `pm_getPaymasterStubData`/`pm_getPaymasterData` return
+ * the same payload, and `params[1]` (entryPoint) picks which paymaster (v0.7 or v0.8) to use.
  */
 export const paymasterRoute = new Hono();
 
-// Conservative, fixed estimates for the paymaster's own validation/postOp gas usage. postOp
-// does one ERC-20 transferFrom-equivalent (a torUSDC balance write); 60_000 comfortably covers
-// it plus the unused-gas-penalty margin described in {PaymasterERC20-_postOpGasPenalty}.
+// postOp does one torUSDC balance write; 60_000 covers it plus the unused-gas-penalty margin.
 const PAYMASTER_VERIFICATION_GAS_LIMIT = 150_000n;
 const PAYMASTER_POST_OP_GAS_LIMIT = 60_000n;
 

@@ -1,10 +1,6 @@
 import { defineChain } from "viem";
 
-/**
- * Arc Testnet, defined locally against the RPC/explorer documented at
- * docs.arc.io/arc/references/connect-to-arc (mirrors contracts/foundry.toml and
- * server/src/chain.ts — kept in sync by hand across the three packages).
- */
+// Mirrors contracts/foundry.toml and server/src/chain.ts — kept in sync by hand.
 export const arcTestnet = defineChain({
   id: 5_042_002,
   name: "Arc Testnet",

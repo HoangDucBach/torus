@@ -1,9 +1,6 @@
 import { parseAbi, type Address } from "viem";
 
-/**
- * Addresses default to the live Arc Testnet deployment recorded at
- * contracts/deployments/5042002.json, overridable per-environment via NEXT_PUBLIC_* vars.
- */
+// Defaults to the live Arc Testnet deployment; overridable via NEXT_PUBLIC_* vars.
 export const addresses = {
   usdc: (process.env.NEXT_PUBLIC_USDC_ADDRESS ??
     "0x3600000000000000000000000000000000000000") as Address,
@@ -15,7 +12,6 @@ export const addresses = {
 
 export const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8787";
 
-/** Minimal, hand-picked ABI surface — only what the frontend actually calls. */
 export const vaultAbi = parseAbi([
   "function depositNative(address receiver) payable returns (uint256 shares)",
   "function redeem(uint256 shares, address receiver, address owner) returns (uint256 assets)",

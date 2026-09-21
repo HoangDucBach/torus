@@ -11,7 +11,6 @@ export type Quote = {
   torUsdcShares: string;
 };
 
-/** Estimated torUSDC cost for a UserOperation of `gas` gas units at `maxFeePerGas` wei. */
 export function useQuote(gas = "200000", maxFeePerGas = "2000000000"): QueryHookResult<Quote> {
   return useQuery({
     queryKey: queryKeys.quote(gas, maxFeePerGas),

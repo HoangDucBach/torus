@@ -2,16 +2,10 @@ import { parseAbiItem } from "viem";
 import { addresses } from "./contracts.ts";
 import { scanLogs } from "./logScanner.ts";
 
-/**
- * Real, on-chain-derived "gas sponsored" totals — summed from every `UserOperationSponsored`
- * event either TorusPaymaster instance (v0.7 and, if deployed, v0.8) has ever emitted. This is
- * the one number in the whole API that can't be read from a single contract getter: it's a
- * running total across every sponsored UserOperation, so it has to be aggregated from logs.
- */
+// No single contract getter tracks this — it's a running total aggregated from every
+// UserOperationSponsored event across both paymaster versions.
 export type GasSponsoredStats = {
-  /** Total torUSDC (18 decimals) ever charged for gas across every sponsored UserOperation. */
   totalTorUsdcCharged: bigint;
-  /** Number of UserOperations sponsored. */
   userOperationCount: number;
 };
 
@@ -19,9 +13,7 @@ const USER_OPERATION_SPONSORED_EVENT = parseAbiItem(
   "event UserOperationSponsored(bytes32 indexed userOpHash, address indexed token, uint256 tokenAmount, uint256 tokenPerNative)"
 );
 
-// In-memory cache: this scan takes several RPC round trips, and the totals only ever grow, so
-// there's no reason to redo it on every /stats request. A short TTL keeps it fresh enough for a
-// dashboard without hammering the RPC.
+// The scan takes several RPC round trips; cache briefly so /stats doesn't redo it every request.
 const CACHE_TTL_MS = 60_000;
 let cache: { value: GasSponsoredStats; expiresAt: number } | undefined;
 

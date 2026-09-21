@@ -4,12 +4,8 @@ import { publicClient } from "./clients.ts";
 import { addresses, entryPointAbi, paymasterAbi, strategyAbi, vaultAbi } from "./contracts.ts";
 import { chain, env, rpcUrl } from "./env.ts";
 
-/**
- * Self-sustaining gas loop, run on an interval: accrue yield -> skim the performance fee ->
- * top the paymaster's EntryPoint deposit back up. None of these calls require special
- * privileges (see {MockRWAStrategy-accrue}, {TorusVault-harvest}, {TorusPaymaster-refuel} — all
- * permissionless by design), so the keeper key only ever needs a little native USDC for gas.
- */
+// accrue yield -> skim performance fee -> top up the paymaster's EntryPoint deposit. All three
+// calls are permissionless by design, so the keeper key only needs a little native USDC for gas.
 async function tick(walletClient: ReturnType<typeof createWalletClient>) {
   const account = walletClient.account!;
 

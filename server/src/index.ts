@@ -7,8 +7,7 @@ import { paymasterRoute } from "./routes/paymaster.ts";
 
 const app = new Hono();
 
-// This API is read-only/public data (stats, quotes) plus a stateless ERC-7677 endpoint — safe
-// to allow any browser origin, matching the intent of a public dashboard like web/.
+// Read-only public data plus a stateless ERC-7677 endpoint — safe to allow any browser origin.
 app.use("*", cors());
 
 app.get("/", (c) =>

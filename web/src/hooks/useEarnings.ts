@@ -9,13 +9,9 @@ import { useIsCorrectNetwork } from "./useIsCorrectNetwork";
 import type { QueryHookResult } from "./types";
 
 export type Earnings = {
-  /** Current value of the account's torUSDC balance, in USDC (6 decimals). */
   currentValue: bigint;
-  /** Total USDC (6 decimals) ever deposited, from the vault's own Deposit events. */
   depositedTotal: bigint;
-  /** Total USDC (6 decimals) ever withdrawn, from the vault's own Withdraw events. */
   withdrawnTotal: bigint;
-  /** currentValue - (depositedTotal - withdrawnTotal) — real, not an APY estimate. */
   earned: bigint;
 };
 
@@ -24,12 +20,6 @@ type PositionResponse = {
   withdrawnTotal: string;
 };
 
-/**
- * Real earnings for the connected account — no APY projection, no off-chain indexer: the
- * current value of its torUSDC balance (read on-chain via previewRedeem) minus its net cost
- * basis (from the server's /position, itself aggregated from the vault's own Deposit/Withdraw
- * events — see server/src/position.ts).
- */
 export function useEarnings(): QueryHookResult<Earnings> {
   const { address } = useAccount();
   const config = useConfig();

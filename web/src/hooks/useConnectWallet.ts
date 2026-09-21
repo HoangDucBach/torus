@@ -5,7 +5,6 @@ import { useConfig, useConnect, useDisconnect } from "wagmi";
 import { connect } from "wagmi/actions";
 import type { MutationHookResult } from "./types";
 
-/** Connects the first available injected wallet (e.g. MetaMask) to Arc Testnet. */
 export function useConnectWallet(): MutationHookResult<void> {
   const config = useConfig();
   const { connectors } = useConnect();
@@ -19,7 +18,6 @@ export function useConnectWallet(): MutationHookResult<void> {
   });
 }
 
-/** Disconnects the currently connected wallet. */
 export function useDisconnectWallet() {
   return useDisconnect();
 }

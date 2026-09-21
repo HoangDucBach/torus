@@ -9,12 +9,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
-        defaultOptions: {
-          // A blocked/unreachable RPC (ad blocker, offline, misconfigured URL) shouldn't hammer
-          // the endpoint dozens of times per minute — one retry is enough to shake off a
-          // one-off network blip, and refetchInterval already re-tries every 10s regardless.
-          queries: { retry: 1 },
-        },
+        // A blocked/unreachable RPC shouldn't hammer the endpoint — refetchInterval already
+        // re-tries regularly regardless.
+        defaultOptions: { queries: { retry: 1 } },
       })
   );
 

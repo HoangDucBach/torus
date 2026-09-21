@@ -18,7 +18,6 @@ type DepositNativeResult = {
   hash: Hash;
 };
 
-/** Wraps `msg.value` native USDC into `torUSDC` shares for the connected account. */
 export function useDepositNative(): MutationHookResult<DepositNativeVariables, DepositNativeResult> {
   const { address } = useAccount();
   const config = useConfig();

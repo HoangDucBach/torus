@@ -1,9 +1,8 @@
 import type { AbiEvent, Address } from "viem";
 import { publicClient } from "./clients.ts";
 
-// The public RPC rejects `eth_getLogs` ranges wider than ~10-20k blocks ("requested range too
-// large") and scans from genesis once history is pruned — chunk every log scan in this app
-// through this one helper instead of re-deriving that limit everywhere it's needed.
+// The public RPC rejects eth_getLogs ranges wider than ~10-20k blocks ("requested range too
+// large") — chunk every scan through this one helper instead of re-deriving that limit elsewhere.
 const MAX_BLOCK_RANGE = 9_000n;
 
 export async function scanLogs<const event extends AbiEvent>(params: {

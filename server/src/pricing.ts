@@ -4,11 +4,7 @@ import { addresses, paymasterAbi, vaultAbi } from "./contracts.ts";
 const BPS_DENOMINATOR = 10_000n;
 const NATIVE_USDC_UNIT = 1_000_000n; // 1 USDC at the vault's 6-decimal asset precision
 
-/**
- * Mirrors {TorusPaymaster-_fetchDetails}: the torUSDC-per-native-unit price, marked up by the
- * paymaster's configured spread. Kept in sync manually since it reads two independent public
- * values (vault exchange rate + paymaster spread) rather than one dedicated view function.
- */
+// Mirrors TorusPaymaster._fetchDetails: torUSDC-per-native-unit, marked up by the spread.
 export async function getTokenPerNative(): Promise<bigint> {
   const [sharesPerNative, spreadBps] = await Promise.all([
     publicClient.readContract({

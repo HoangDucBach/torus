@@ -18,7 +18,6 @@ type WithdrawResult = {
   hash: Hash;
 };
 
-/** Redeems torUSDC shares back into USDC (native + ERC-20, same underlying balance on Arc). */
 export function useWithdraw(): MutationHookResult<WithdrawVariables, WithdrawResult> {
   const { address } = useAccount();
   const config = useConfig();
