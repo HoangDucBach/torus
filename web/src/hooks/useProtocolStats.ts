@@ -16,6 +16,8 @@ export type ProtocolStats = {
   spreadBps: number;
   strategy: { address: string; totalAssets: string; reserve: string };
   paymasterEntryPointDeposit: string;
+  /** Real totals aggregated from every sponsored UserOperation — see server/src/gasStats.ts. */
+  gasSponsored: { totalTorUsdcCharged: string; userOperationCount: number };
 };
 
 /** Reads Torus's protocol-wide numbers from the server's `GET /stats` endpoint. */
