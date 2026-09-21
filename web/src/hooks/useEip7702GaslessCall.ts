@@ -87,11 +87,17 @@ export function useEip7702GaslessCall(): MutationHookResult<void, Eip7702Gasless
         owner: { request: provider.request.bind(provider) },
       });
 
-      const authorization = await signAuthorization({
-        contractAddress: SIMPLE_7702_ACCOUNT_IMPL,
-        chainId: arcTestnet.id,
-        nonce: await publicClient.getTransactionCount({ address: account.address }),
-      });
+      const authorization = await signAuthorization(
+        {
+          contractAddress: SIMPLE_7702_ACCOUNT_IMPL,
+          chainId: arcTestnet.id,
+          nonce: await publicClient.getTransactionCount({ address: account.address }),
+        },
+        // Without this, Privy tries to resolve "the" signing wallet on its own (e.g. via the
+        // user's primary linked account) and throws "Signing wallet not found" for a user whose
+        // embedded wallet isn't set as primary — the address found above is unambiguous.
+        { address: embeddedWallet.address }
+      );
 
       const paymaster = createPaymasterClient({ transport: http(`${serverUrl}/paymaster`) });
       const bundlerClient = createBundlerClient({
