@@ -3,10 +3,13 @@
 .env.*
 !.env.example
 
-# --- Foundry (contracts/) ---
+# --- Foundry (contracts/, examples/gasless-demo/contracts/) ---
 contracts/out/
 contracts/cache/
 contracts/broadcast/*/dry-run/
+examples/gasless-demo/contracts/out/
+examples/gasless-demo/contracts/cache/
+examples/gasless-demo/contracts/broadcast/*/dry-run/
 # contracts/deployments/<chainId>.json is the canonical, committed record of deployed
 # addresses (written by script/Deploy.s.sol, read by server/src/env.ts) — public addresses,
 # not secrets, so it is intentionally NOT ignored.
