@@ -1,8 +1,9 @@
 "use client";
 
-import { useSign7702Authorization, useWallets } from "@privy-io/react-auth";
+import { useCreateWallet, useSign7702Authorization, useWallets } from "@privy-io/react-auth";
 import { to7702SimpleSmartAccount } from "permissionless/accounts";
 import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { createPublicClient, http, zeroAddress, type Hash } from "viem";
 import { createBundlerClient, createPaymasterClient } from "viem/account-abstraction";
 import { arcTestnet } from "@/lib/chain";
@@ -19,6 +20,10 @@ type Eip7702GaslessCallResult = {
   txHash: Hash;
 };
 
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Sends a trivial, fully-sponsored UserOperation from the user's own EOA — via EIP-7702, with
  * no separate smart-account contract ever deployed for it — paid entirely out of its torUSDC
@@ -34,6 +39,16 @@ type Eip7702GaslessCallResult = {
 export function useEip7702GaslessCall(): MutationHookResult<void, Eip7702GaslessCallResult> {
   const { signAuthorization } = useSign7702Authorization();
   const { wallets } = useWallets();
+  const { createWallet } = useCreateWallet();
+
+  // `wallets` closed over by `mutationFn` below would otherwise be a snapshot from whichever
+  // render created this particular `useMutation` instance — stale by the time an in-flight
+  // `createWallet()` call resolves and Privy's own state (and therefore `useWallets()`) updates.
+  // Reading through a ref kept fresh by this effect lets the retry loop below see that update.
+  const walletsRef = useRef(wallets);
+  useEffect(() => {
+    walletsRef.current = wallets;
+  }, [wallets]);
 
   return useMutation({
     mutationFn: async () => {
@@ -42,8 +57,24 @@ export function useEip7702GaslessCall(): MutationHookResult<void, Eip7702Gasless
         throw new Error("Set NEXT_PUBLIC_BUNDLER_URL to a bundler that supports Arc Testnet (e.g. Pimlico)");
       }
 
-      const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
-      if (!embeddedWallet) throw new Error("Log in with Privy first to create an embedded wallet");
+      const findEmbeddedWallet = () => walletsRef.current.find((w) => w.walletClientType === "privy");
+
+      let embeddedWallet = findEmbeddedWallet();
+      if (!embeddedWallet) {
+        // `createOnLogin` only auto-creates an embedded wallet for users who log in with no
+        // wallet at all (e.g. email/OTP); a user who connected an external wallet through
+        // Privy's modal has none, so create one on demand instead of failing outright.
+        await createWallet();
+        // Privy's own state (and this hook's `wallets`) updates asynchronously after that
+        // resolves — poll briefly rather than assuming it's already reflected.
+        for (let attempt = 0; !embeddedWallet && attempt < 20; attempt++) {
+          await sleep(250);
+          embeddedWallet = findEmbeddedWallet();
+        }
+      }
+      if (!embeddedWallet) {
+        throw new Error("Could not find or create a Privy embedded wallet — try again");
+      }
 
       const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
       const provider = await embeddedWallet.getEthereumProvider();
