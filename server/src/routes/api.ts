@@ -1,10 +1,33 @@
 import { Hono } from "hono";
+import { isAddress, type Address } from "viem";
 import { publicClient } from "../clients.ts";
 import { addresses, entryPointAbi, paymasterAbi, strategyAbi, vaultAbi } from "../contracts.ts";
 import { getGasSponsoredStats } from "../gasStats.ts";
+import { getPositionCostBasis } from "../position.ts";
 import { getTokenPerNative, nativeCostToTorUsdc } from "../pricing.ts";
 
 export const apiRoute = new Hono();
+
+/**
+ * GET /position?address=0x...
+ * Real cost basis for one account — total USDC ever deposited/withdrawn, derived from the
+ * vault's own Deposit/Withdraw events (see position.ts). Paired with the account's current
+ * torUSDC balance (read directly on-chain by the caller), this is enough to compute real
+ * earnings: `previewRedeem(balance) - (depositedTotal - withdrawnTotal)`.
+ */
+apiRoute.get("/position", async (c) => {
+  const address = c.req.query("address");
+  if (!address || !isAddress(address)) {
+    return c.json({ error: "query param 'address' (a valid 0x address) is required" }, 400);
+  }
+
+  const { depositedTotal, withdrawnTotal } = await getPositionCostBasis(address as Address);
+  return c.json({
+    address,
+    depositedTotal: depositedTotal.toString(),
+    withdrawnTotal: withdrawnTotal.toString(),
+  });
+});
 
 /**
  * GET /quote?gas=<uint>&maxFeePerGas=<wei>

@@ -1,6 +1,6 @@
 import { parseAbiItem } from "viem";
-import { publicClient } from "./clients.ts";
 import { addresses } from "./contracts.ts";
+import { scanLogs } from "./logScanner.ts";
 
 /**
  * Real, on-chain-derived "gas sponsored" totals — summed from every `UserOperationSponsored`
@@ -19,28 +19,6 @@ const USER_OPERATION_SPONSORED_EVENT = parseAbiItem(
   "event UserOperationSponsored(bytes32 indexed userOpHash, address indexed token, uint256 tokenAmount, uint256 tokenPerNative)"
 );
 
-// The public RPC rejects `eth_getLogs` ranges wider than ~10-20k blocks ("requested range too
-// large") — chunk the scan instead of requesting the whole range in one call.
-const MAX_BLOCK_RANGE = 9_000n;
-
-async function fetchSponsoredEvents(paymaster: `0x${string}`, fromBlock: bigint) {
-  const latest = await publicClient.getBlockNumber();
-  const events = [];
-
-  for (let start = fromBlock; start <= latest; start += MAX_BLOCK_RANGE + 1n) {
-    const end = start + MAX_BLOCK_RANGE < latest ? start + MAX_BLOCK_RANGE : latest;
-    const logs = await publicClient.getLogs({
-      address: paymaster,
-      event: USER_OPERATION_SPONSORED_EVENT,
-      fromBlock: start,
-      toBlock: end,
-    });
-    events.push(...logs);
-  }
-
-  return events;
-}
-
 // In-memory cache: this scan takes several RPC round trips, and the totals only ever grow, so
 // there's no reason to redo it on every /stats request. A short TTL keeps it fresh enough for a
 // dashboard without hammering the RPC.
@@ -55,8 +33,11 @@ export async function getGasSponsoredStats(): Promise<GasSponsoredStats> {
     (p): p is `0x${string}` => Boolean(p)
   );
 
-  const eventLists = await Promise.all(paymasters.map((p) => fetchSponsoredEvents(p, fromBlock)));
-  const events = eventLists.flat();
+  const events = await scanLogs({
+    address: paymasters,
+    event: USER_OPERATION_SPONSORED_EVENT,
+    fromBlock,
+  });
 
   const value: GasSponsoredStats = {
     totalTorUsdcCharged: events.reduce((sum, log) => sum + (log.args.tokenAmount ?? 0n), 0n),
