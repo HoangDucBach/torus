@@ -1,0 +1,22 @@
+{
+  "name": "torus-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "keeper": "bun run src/keeper.ts",
+    "e2e": "bun run scripts/e2e.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.13.8",
+    "viem": "^2.56.8",
+    "permissionless": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.7.0"
+  }
+}
