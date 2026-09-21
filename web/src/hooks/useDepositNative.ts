@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { parseEther, type Hash } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { arcTestnet } from "@/lib/chain";
 import { addresses, vaultAbi } from "@/lib/contracts";
 import { queryKeys } from "@/lib/queryKeys";
 import type { MutationHookResult } from "./types";
@@ -33,6 +34,7 @@ export function useDepositNative(): MutationHookResult<DepositNativeVariables, D
         functionName: "depositNative",
         args: [address],
         value: parseEther(amount),
+        chainId: arcTestnet.id,
       });
 
       await waitForTransactionReceipt(config, { hash });

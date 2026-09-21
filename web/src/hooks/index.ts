@@ -6,3 +6,6 @@ export * from "./useNativeBalance";
 export * from "./useDepositNative";
 export * from "./useConnectWallet";
 export * from "./useBridgeToArc";
+export * from "./useIsCorrectNetwork";
+export * from "./useSwitchToArcTestnet";
+export * from "./useEip7702GaslessCall";
