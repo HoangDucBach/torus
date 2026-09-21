@@ -53,7 +53,7 @@ contract FullLifecycleTest is Test {
         vm.prank(admin);
         strategy.setVault(address(vault));
 
-        paymaster = new TorusPaymaster(vault, 500, admin);
+        paymaster = new TorusPaymaster(vault, 500, admin, ENTRYPOINT);
 
         vm.prank(admin);
         vault.setGasSpender(address(paymaster));

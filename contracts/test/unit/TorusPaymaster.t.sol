@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {PackedUserOperation, IPaymaster} from "@openzeppelin/contracts/interfaces/IERC4337.sol";
+import {PackedUserOperation, IPaymaster, IEntryPoint} from "@openzeppelin/contracts/interfaces/IERC4337.sol";
 import {ERC4337Utils} from "@openzeppelin/contracts/account/utils/ERC4337Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -44,7 +44,7 @@ contract TorusPaymasterTest is Test {
         vm.prank(admin);
         strategy.setVault(address(vault));
 
-        paymaster = new TorusPaymaster(vault, SPREAD_BPS, owner);
+        paymaster = new TorusPaymaster(vault, SPREAD_BPS, owner, IEntryPoint(ENTRYPOINT_ADDR));
 
         vm.prank(admin);
         vault.setGasSpender(address(paymaster));

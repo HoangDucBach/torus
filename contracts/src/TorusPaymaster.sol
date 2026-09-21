@@ -11,13 +11,17 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ITorusVault} from "./interfaces/ITorusVault.sol";
 
 /// @title TorusPaymaster
-/// @notice ERC-4337 v0.7 paymaster that lets any smart account pay gas out of its `torUSDC`
-/// balance, priced directly off {TorusVault}'s internal exchange rate — no external price
-/// oracle or DEX swap is ever consulted, eliminating the FX/oracle-manipulation surface a
-/// typical ERC-20 paymaster carries.
+/// @notice ERC-4337 paymaster that lets any account — a deployed smart account (SimpleAccount,
+/// Kernel, Safe, ...) or, via EIP-7702, an unmodified EOA temporarily acting as one — pay gas
+/// out of its `torUSDC` balance, priced directly off {TorusVault}'s internal exchange rate. No
+/// external price oracle or DEX swap is ever consulted, eliminating the FX/oracle-manipulation
+/// surface a typical ERC-20 paymaster carries.
 /// @dev Built on OpenZeppelin's {PaymasterERC20}, which implements the ERC-4337
 /// pre-charge/refund lifecycle; this contract only supplies Torus-specific pricing
-/// ({_fetchDetails}) and the self-refueling loop ({refuel}).
+/// ({_fetchDetails}) and the self-refueling loop ({refuel}). The target {IEntryPoint} is an
+/// immutable constructor parameter rather than hardcoded, since Arc has EntryPoint v0.7, v0.8
+/// (required for EIP-7702 accounts) and v0.9 all deployed at their canonical addresses — the
+/// same contract is deployed once per version that needs sponsoring.
 contract TorusPaymaster is PaymasterERC20, Ownable2Step {
     using Math for uint256;
 
@@ -39,24 +43,27 @@ contract TorusPaymaster is PaymasterERC20, Ownable2Step {
 
     ITorusVault public immutable vault;
     IERC20 public immutable torUSDC;
+    IEntryPoint private immutable _entryPoint;
 
     /// @notice Convenience markup applied on top of the vault's exchange rate, in basis points.
     uint16 public spreadBps;
 
     uint256 private _minTokensPerNativeValue;
 
-    constructor(ITorusVault vault_, uint16 spreadBps_, address owner_) Ownable(owner_) {
-        if (address(vault_) == address(0) || owner_ == address(0)) revert TorusPaymasterZeroAddress();
+    constructor(ITorusVault vault_, uint16 spreadBps_, address owner_, IEntryPoint entryPoint_) Ownable(owner_) {
+        if (address(vault_) == address(0) || owner_ == address(0) || address(entryPoint_) == address(0)) {
+            revert TorusPaymasterZeroAddress();
+        }
         if (spreadBps_ > MAX_SPREAD_BPS) revert TorusPaymasterSpreadTooHigh(spreadBps_);
 
         vault = vault_;
         torUSDC = IERC20(address(vault_));
         spreadBps = spreadBps_;
+        _entryPoint = entryPoint_;
     }
 
-    /// @dev Targets ERC-4337 EntryPoint v0.7, the canonical instance deployed on Arc.
-    function entryPoint() public pure override returns (IEntryPoint) {
-        return ERC4337Utils.ENTRYPOINT_V07;
+    function entryPoint() public view override returns (IEntryPoint) {
+        return _entryPoint;
     }
 
     receive() external payable {}

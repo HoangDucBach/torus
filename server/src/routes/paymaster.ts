@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { numberToHex } from "viem";
-import { addresses } from "../contracts.ts";
+import { numberToHex, type Address } from "viem";
+import { paymasterForEntryPoint } from "../contracts.ts";
 
 /**
  * ERC-7677 (`pm_*`) paymaster RPC. Any AA SDK that speaks this standard (viem's
@@ -12,6 +12,11 @@ import { addresses } from "../contracts.ts";
  * always empty and the two ERC-7677 methods return practically the same payload — the only
  * difference upstream is *when* each is called (stub data during gas estimation, final data
  * once the account has settled its gas limits).
+ *
+ * Torus runs one paymaster per EntryPoint version (v0.7 for deployed smart accounts, v0.8 for
+ * EIP-7702 accounts — see `contracts.ts`), so every response is resolved from the `entryPoint`
+ * the caller passes in `params[1]`, per the ERC-7677 request shape
+ * `[userOp, entryPoint, chainId, context?]`.
  */
 export const paymasterRoute = new Hono();
 
@@ -28,9 +33,9 @@ type JsonRpcRequest = {
   params?: unknown[];
 };
 
-function paymasterStubResult() {
+function paymasterStubResult(paymaster: Address) {
   return {
-    paymaster: addresses.paymaster,
+    paymaster,
     paymasterData: "0x" as const,
     paymasterVerificationGasLimit: numberToHex(PAYMASTER_VERIFICATION_GAS_LIMIT),
     paymasterPostOpGasLimit: numberToHex(PAYMASTER_POST_OP_GAS_LIMIT),
@@ -38,9 +43,9 @@ function paymasterStubResult() {
   };
 }
 
-function paymasterDataResult() {
+function paymasterDataResult(paymaster: Address) {
   return {
-    paymaster: addresses.paymaster,
+    paymaster,
     paymasterData: "0x" as const,
   };
 }
@@ -52,11 +57,27 @@ paymasterRoute.post("/", async (c) => {
   const respondError = (code: number, message: string) =>
     c.json({ jsonrpc: "2.0", id: body.id, error: { code, message } }, 200);
 
+  const requestedEntryPoint = body.params?.[1] as Address | undefined;
+
   switch (body.method) {
     case "pm_getPaymasterStubData":
-      return respond(paymasterStubResult());
-    case "pm_getPaymasterData":
-      return respond(paymasterDataResult());
+    case "pm_getPaymasterData": {
+      if (!requestedEntryPoint) {
+        return respondError(-32602, "params[1] (entryPoint) is required");
+      }
+      const paymaster = paymasterForEntryPoint(requestedEntryPoint);
+      if (!paymaster) {
+        return respondError(
+          -32000,
+          `No Torus paymaster configured for EntryPoint ${requestedEntryPoint}`
+        );
+      }
+      return respond(
+        body.method === "pm_getPaymasterStubData"
+          ? paymasterStubResult(paymaster)
+          : paymasterDataResult(paymaster)
+      );
+    }
     default:
       return respondError(-32601, `Method not found: ${body.method}`);
   }

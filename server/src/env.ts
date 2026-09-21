@@ -9,13 +9,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export type Deployment = {
   chainId: number;
   usdc: Address;
-  entryPoint: Address;
+  entryPoint: Address; // EntryPoint v0.7 — deployed smart accounts (SimpleAccount, Kernel, Safe, ...)
   oracle: Address;
   strategy: Address;
   vault: Address;
-  paymaster: Address;
+  paymaster: Address; // targets `entryPoint` (v0.7)
   treasury: Address;
   admin: Address;
+  // Written by script/DeployPaymaster.s.sol: a second paymaster targeting EntryPoint v0.8,
+  // required for EIP-7702 accounts (an EOA temporarily delegated to Simple7702Account has no
+  // separate deployed contract, so it must use v0.8 — see contracts/src/TorusPaymaster.sol).
+  entryPointV08?: Address;
+  paymasterV08?: Address;
 };
 
 const network = (process.env.ARC_NETWORK === "mainnet" ? "mainnet" : "testnet") as

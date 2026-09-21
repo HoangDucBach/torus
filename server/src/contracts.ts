@@ -1,7 +1,23 @@
-import { parseAbi } from "viem";
+import { parseAbi, type Address } from "viem";
 import { deployment } from "./env.ts";
 
 export const addresses = deployment;
+
+/**
+ * Torus runs one paymaster per EntryPoint version it supports: v0.7 for deployed smart accounts
+ * (SimpleAccount, Kernel, Safe, ...) and v0.8 for EIP-7702 accounts (an EOA has no separate
+ * deployed contract, so it must target the version its delegated code — Simple7702Account —
+ * expects). ERC-7677 requests carry the caller's target `entryPoint`, so the paymaster route
+ * looks it up here rather than hardcoding a single address for every request.
+ */
+export function paymasterForEntryPoint(entryPoint: Address): Address | undefined {
+  const normalized = entryPoint.toLowerCase();
+  if (normalized === addresses.entryPoint.toLowerCase()) return addresses.paymaster;
+  if (addresses.entryPointV08 && normalized === addresses.entryPointV08.toLowerCase()) {
+    return addresses.paymasterV08;
+  }
+  return undefined;
+}
 
 /** Minimal, hand-picked ABI surface — only what this server actually calls. */
 export const vaultAbi = parseAbi([

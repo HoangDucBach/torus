@@ -31,30 +31,32 @@ apiRoute.get("/quote", async (c) => {
 
 /** GET /stats — protocol-wide numbers for a dashboard or health check. */
 apiRoute.get("/stats", async (c) => {
-  const [
-    totalAssets,
-    totalSupply,
-    rate,
-    performanceFeeBps,
-    strategyAssets,
-    strategyReserve,
-    spreadBps,
-    paymasterDeposit,
-  ] = await Promise.all([
-    publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "totalAssets" }),
-    publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "totalSupply" }),
-    publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "getRate" }),
-    publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "performanceFeeBps" }),
-    publicClient.readContract({ address: addresses.strategy, abi: strategyAbi, functionName: "totalAssets" }),
-    publicClient.readContract({ address: addresses.strategy, abi: strategyAbi, functionName: "reserve" }),
-    publicClient.readContract({ address: addresses.paymaster, abi: paymasterAbi, functionName: "spreadBps" }),
-    publicClient.readContract({
-      address: addresses.entryPoint,
-      abi: entryPointAbi,
-      functionName: "balanceOf",
-      args: [addresses.paymaster],
-    }),
-  ]);
+  const [totalAssets, totalSupply, rate, performanceFeeBps, strategyAssets, strategyReserve, spreadBps, paymasterDeposit] =
+    await Promise.all([
+      publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "totalAssets" }),
+      publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "totalSupply" }),
+      publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "getRate" }),
+      publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "performanceFeeBps" }),
+      publicClient.readContract({ address: addresses.strategy, abi: strategyAbi, functionName: "totalAssets" }),
+      publicClient.readContract({ address: addresses.strategy, abi: strategyAbi, functionName: "reserve" }),
+      publicClient.readContract({ address: addresses.paymaster, abi: paymasterAbi, functionName: "spreadBps" }),
+      publicClient.readContract({
+        address: addresses.entryPoint,
+        abi: entryPointAbi,
+        functionName: "balanceOf",
+        args: [addresses.paymaster],
+      }),
+    ]);
+
+  const paymasterV08Deposit =
+    addresses.paymasterV08 && addresses.entryPointV08
+      ? await publicClient.readContract({
+          address: addresses.entryPointV08,
+          abi: entryPointAbi,
+          functionName: "balanceOf",
+          args: [addresses.paymasterV08],
+        })
+      : undefined;
 
   return c.json({
     chainId: (await publicClient.getChainId()).toString(),
@@ -71,5 +73,14 @@ apiRoute.get("/stats", async (c) => {
       reserve: strategyReserve.toString(),
     },
     paymasterEntryPointDeposit: paymasterDeposit.toString(),
+    // EIP-7702 support (see contracts/src/TorusPaymaster.sol) — an EOA delegated to
+    // Simple7702Account has no separate deployed contract, so it must use EntryPoint v0.8.
+    eip7702: addresses.paymasterV08
+      ? {
+          entryPoint: addresses.entryPointV08,
+          paymaster: addresses.paymasterV08,
+          paymasterEntryPointDeposit: paymasterV08Deposit?.toString(),
+        }
+      : null,
   });
 });

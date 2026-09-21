@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IEntryPoint} from "@openzeppelin/contracts/interfaces/IERC4337.sol";
+import {ERC4337Utils} from "@openzeppelin/contracts/account/utils/ERC4337Utils.sol";
 
 import {TorusVault} from "../src/TorusVault.sol";
 import {TorusPaymaster} from "../src/TorusPaymaster.sol";
@@ -33,13 +35,18 @@ contract Deploy is Script {
         address admin = vm.envOr("ADMIN_ADDR", deployer);
         uint16 performanceFeeBps = uint16(vm.envOr("PERFORMANCE_FEE_BPS", uint256(1_000))); // 10%
         uint16 spreadBps = uint16(vm.envOr("SPREAD_BPS", uint256(500))); // 5%
+        // Defaults to v0.7 (the canonical instance used by SimpleAccount/Kernel/Safe deployed on
+        // Arc). Pass ENTRYPOINT_ADDR=0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 for v0.8, needed
+        // by EIP-7702 accounts — see script/DeployPaymaster.s.sol to add one of these to an
+        // already-deployed vault instead of redeploying the whole stack.
+        address entryPointAddr = vm.envOr("ENTRYPOINT_ADDR", address(ERC4337Utils.ENTRYPOINT_V07));
 
         vm.startBroadcast(deployerPrivateKey);
 
         oracle = new MockRWAOracle(admin);
         strategy = new MockRWAStrategy(IERC20(usdc), oracle, admin);
         vault = new TorusVault(IERC20(usdc), strategy, treasury, performanceFeeBps, admin);
-        paymaster = new TorusPaymaster(vault, spreadBps, admin);
+        paymaster = new TorusPaymaster(vault, spreadBps, admin, IEntryPoint(entryPointAddr));
 
         vm.stopBroadcast();
 
@@ -55,7 +62,16 @@ contract Deploy is Script {
             console.log("admin != deployer: run strategy.setVault + vault.setGasSpender separately");
         }
 
-        _writeDeployment(usdc, address(oracle), address(strategy), address(vault), address(paymaster), treasury, admin);
+        _writeDeployment(
+            usdc,
+            address(oracle),
+            address(strategy),
+            address(vault),
+            address(paymaster),
+            treasury,
+            admin,
+            entryPointAddr
+        );
         _logSummary(usdc, address(oracle), address(strategy), address(vault), address(paymaster));
     }
 
@@ -66,12 +82,13 @@ contract Deploy is Script {
         address vault,
         address paymaster,
         address treasury,
-        address admin
+        address admin,
+        address entryPointAddr
     ) internal {
         string memory json = "deployment";
         vm.serializeUint(json, "chainId", block.chainid);
         vm.serializeAddress(json, "usdc", usdc);
-        vm.serializeAddress(json, "entryPoint", 0x0000000071727De22E5E9d8BAf0edAc6f37da032);
+        vm.serializeAddress(json, "entryPoint", entryPointAddr);
         vm.serializeAddress(json, "oracle", oracle);
         vm.serializeAddress(json, "strategy", strategy);
         vm.serializeAddress(json, "vault", vault);
