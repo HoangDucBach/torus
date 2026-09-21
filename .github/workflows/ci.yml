@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    name: Contracts (Arc Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Arc's execution semantics (native USDC as gas, dual-decimal accounting, etc.) differ
+      # from upstream Ethereum, so upstream `foundry-rs/foundry-toolchain` would silently test
+      # against the wrong rules — Arc Foundry must be installed manually instead.
+      - name: Install Arc Foundry
+        run: |
+          version=v0.8.0-1
+          curl -sSL -o arc-foundry.tar.gz \
+            "https://github.com/circlefin/arc-foundry/releases/download/${version}/arc-foundry-${version}-x86_64-unknown-linux-gnu.tar.gz"
+          tar -xzf arc-foundry.tar.gz
+          sudo mv forge /usr/local/bin/arc-forge
+          sudo mv cast /usr/local/bin/arc-cast
+          sudo mv anvil /usr/local/bin/arc-anvil
+          arc-forge --version
+
+      - name: Format check
+        working-directory: contracts
+        run: arc-forge fmt --check
+
+      - name: Build
+        working-directory: contracts
+        run: FOUNDRY_PROFILE=arc arc-forge build
+
+      - name: Unit, mock and invariant tests
+        working-directory: contracts
+        run: FOUNDRY_PROFILE=arc arc-forge test --no-match-contract FullLifecycleTest -vvv
+
+      - name: Integration test (forked from live Arc Testnet)
+        working-directory: contracts
+        env:
+          ARC_TESTNET_RPC_URL: ${{ secrets.ARC_TESTNET_RPC_URL || 'https://rpc.testnet.arc.io' }}
+        run: FOUNDRY_PROFILE=arc arc-forge test --match-contract FullLifecycleTest -vvv
+
+  server:
+    name: Server (Bun)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: server
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: server
+        run: bun run typecheck
