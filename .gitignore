@@ -1,0 +1,20 @@
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Foundry (contracts/) ---
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/dry-run/
+# contracts/deployments/<chainId>.json is the canonical, committed record of deployed
+# addresses (written by script/Deploy.s.sol, read by server/src/env.ts) — public addresses,
+# not secrets, so it is intentionally NOT ignored.
+
+# --- Bun / Node (server/) ---
+server/node_modules/
+server/dist/
+
+# --- Misc ---
+.DS_Store
+*.log
