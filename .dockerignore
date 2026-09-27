@@ -1,0 +1,16 @@
+.git
+**/node_modules
+**/.next
+**/.turbo
+**/out
+**/cache
+**/broadcast/*/dry-run
+**/.env
+**/.env.*
+web/
+examples/
+contracts/src
+contracts/test
+contracts/script
+*.log
+.DS_Store
