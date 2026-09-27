@@ -1,0 +1,19 @@
+# Reverse proxy for the EC2 deployment (see docker-compose.yml) — terminates HTTPS so the
+# Vercel-hosted web app (served over https) isn't blocked calling the API as mixed content.
+# One hostname, path-routed to each network's container since no subdomains are set up.
+#
+# Uses sslip.io (98.81.127.228 -> 98.81.127.228.sslip.io) instead of the EC2-assigned
+# *.amazonaws.com hostname: Let's Encrypt blocks issuing certs for amazonaws.com outright (shared
+# cloud-provider domain, abuse policy). Swap this for a real domain's A record once one exists —
+# same Caddyfile, just change the hostname below and point DNS at 98.81.127.228.
+98.81.127.228.sslip.io {
+	handle_path /testnet/* {
+		reverse_proxy localhost:8787
+	}
+
+	handle_path /mainnet/* {
+		reverse_proxy localhost:8788
+	}
+
+	respond "Torus Protocol API — see /testnet/* or /mainnet/*" 200
+}
