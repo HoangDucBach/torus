@@ -135,15 +135,28 @@ needed since all state lives on-chain.
 | `GET /quote` | Estimated `torUSDC` cost for a given `gas`/`maxFeePerGas`, computed with the same formula as the on-chain paymaster. |
 | `GET /stats` | TVL, exchange rate, fee/spread config, strategy reserve, paymaster EntryPoint deposit. |
 
+A background indexer (`src/indexer.ts`) catches up once at boot and then tails
+`UserOperationSponsored`/`Deposit`/`Withdraw` events live, persisting totals to Postgres
+(`DATABASE_URL`) instead of re-scanning on every request. Rows are keyed by chain id, so a
+testnet and a mainnet instance can safely share one database.
+
 ```bash
 cd server
 bun install
-cp .env.example .env   # fill in ARC_NETWORK / DEPLOYMENT_FILE / KEEPER_PRIVATE_KEY
+cp .env.example .env   # DATABASE_URL / KEEPER_PRIVATE_KEY, shared by both networks below
+docker compose up -d postgres   # or point DATABASE_URL at your own Postgres
 
-bun run start     # the API (paymaster + /quote + /stats)
-bun run keeper     # accrue → harvest → refuel loop, on KEEPER_INTERVAL_SECONDS
-bun run e2e        # full flow via a real bundler (needs BUNDLER_RPC_URL, see scripts/e2e.ts)
+bun run start        # testnet — loads .env.development (see .env.production for mainnet)
+bun run keeper        # accrue → harvest → refuel loop, on KEEPER_INTERVAL_SECONDS
+bun run e2e           # full flow via a real bundler (needs BUNDLER_RPC_URL, see scripts/e2e.ts)
 ```
+
+**Docker**: `docker compose up -d --build` runs Postgres + the testnet server together (see
+[`server/Dockerfile`](server/Dockerfile) and [`docker-compose.yml`](docker-compose.yml)). The
+image builds from the repo root since it needs `contracts/deployments/`; for a standalone
+build/push to a registry (e.g. ECR): `docker build -f server/Dockerfile -t torus-server .`. On
+AWS this is a plain container (ECS/Fargate) pointed at an RDS Postgres instance via
+`DATABASE_URL` — no local disk state to worry about.
 
 ## Web dashboard (`web/`)
 
@@ -171,12 +184,12 @@ scattered across hooks.
 **Real earnings, no APY estimate** — `useEarnings` combines an on-chain `previewRedeem` call
 (the account's torUSDC balance priced at the current share rate) with the server's `GET
 /position` endpoint, which aggregates the vault's own `Deposit`/`Withdraw` events per address
-into a net cost basis (`server/src/position.ts`). `earned = currentValue - (deposited -
+into a net cost basis (`server/src/indexer.ts`). `earned = currentValue - (deposited -
 withdrawn)` — derived entirely from on-chain events, never projected.
 
-**Protocol stats** include real gas-sponsored totals — `server/src/gasStats.ts` scans
-`UserOperationSponsored` events from both paymasters (chunked `eth_getLogs`, since public RPCs
-cap range size) and reports cumulative torUSDC charged and UserOperation count.
+**Protocol stats** include real gas-sponsored totals — the same indexer tails
+`UserOperationSponsored` events from both paymasters and reports cumulative torUSDC charged and
+UserOperation count.
 
 ```bash
 cd web
