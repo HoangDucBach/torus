@@ -1,16 +1,4 @@
-import { parseAbi, type Address } from "viem";
-
-// Defaults to the live Arc Testnet deployment; overridable via NEXT_PUBLIC_* vars.
-export const addresses = {
-  usdc: (process.env.NEXT_PUBLIC_USDC_ADDRESS ??
-    "0x3600000000000000000000000000000000000000") as Address,
-  vault: (process.env.NEXT_PUBLIC_VAULT_ADDRESS ??
-    "0xF87e393cdC523E69dE27e2E992225136d654273b") as Address,
-  paymaster: (process.env.NEXT_PUBLIC_PAYMASTER_ADDRESS ??
-    "0x497B7b6aAcB8a3372D569740c92ED53F75ED670B") as Address,
-};
-
-export const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:8787";
+import { parseAbi } from "viem";
 
 export const vaultAbi = parseAbi([
   "function depositNative(address receiver) payable returns (uint256 shares)",
@@ -20,4 +8,9 @@ export const vaultAbi = parseAbi([
   "function getRate() view returns (uint256)",
   "function previewDeposit(uint256 assets) view returns (uint256)",
   "function previewRedeem(uint256 shares) view returns (uint256 assets)",
+]);
+
+export const counterAbi = parseAbi([
+  "function increment() returns (uint256)",
+  "function count() view returns (uint256)",
 ]);

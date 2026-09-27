@@ -3,9 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, useConfig } from "wagmi";
 import { readContract } from "wagmi/actions";
-import { addresses, serverUrl, vaultAbi } from "@/lib/contracts";
+import { vaultAbi } from "@/lib/contracts";
 import { queryKeys } from "@/lib/queryKeys";
 import { useIsCorrectNetwork } from "./useIsCorrectNetwork";
+import { useNetwork } from "./useNetwork";
 import type { QueryHookResult } from "./types";
 
 export type Earnings = {
@@ -24,28 +25,31 @@ export function useEarnings(): QueryHookResult<Earnings> {
   const { address } = useAccount();
   const config = useConfig();
   const isCorrectNetwork = useIsCorrectNetwork();
+  const { networkId, network } = useNetwork();
 
   return useQuery({
-    queryKey: queryKeys.position(address),
+    queryKey: queryKeys.position(networkId, address),
     queryFn: async () => {
       const [shares, position] = await Promise.all([
         readContract(config, {
-          address: addresses.vault,
+          address: network.addresses.vault,
           abi: vaultAbi,
           functionName: "balanceOf",
           args: [address!],
+          chainId: network.chain.id,
         }),
-        fetch(`${serverUrl}/position?address=${address}`).then((res) => {
+        fetch(`${network.serverUrl}/position?address=${address}`).then((res) => {
           if (!res.ok) throw new Error(`Failed to fetch position (${res.status})`);
           return res.json() as Promise<PositionResponse>;
         }),
       ]);
 
       const currentValue = await readContract(config, {
-        address: addresses.vault,
+        address: network.addresses.vault,
         abi: vaultAbi,
         functionName: "previewRedeem",
         args: [shares],
+        chainId: network.chain.id,
       });
 
       const depositedTotal = BigInt(position.depositedTotal);
@@ -59,6 +63,5 @@ export function useEarnings(): QueryHookResult<Earnings> {
       };
     },
     enabled: Boolean(address) && isCorrectNetwork,
-    refetchInterval: 15_000,
   });
 }

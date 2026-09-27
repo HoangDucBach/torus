@@ -8,4 +8,6 @@ export * from "./useWithdraw";
 export * from "./useEarnings";
 export * from "./useConnectWallet";
 export * from "./useIsCorrectNetwork";
-export * from "./useSwitchToArcTestnet";
+export * from "./useSwitchToArc";
+export * from "./useGaslessIncrement";
+export * from "./useNetwork";

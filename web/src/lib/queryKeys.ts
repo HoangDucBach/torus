@@ -1,9 +1,12 @@
 import type { Address } from "viem";
+import type { NetworkId } from "./networks";
 
 export const queryKeys = {
-  protocolStats: ["protocolStats"] as const,
-  quote: (gas: string, maxFeePerGas: string) => ["quote", gas, maxFeePerGas] as const,
-  torBalance: (address?: Address) => ["torBalance", address] as const,
-  nativeBalance: (address?: Address) => ["nativeBalance", address] as const,
-  position: (address?: Address) => ["position", address] as const,
+  protocolStats: (network: NetworkId) => ["protocolStats", network] as const,
+  quote: (network: NetworkId, gas: string, maxFeePerGas: string) =>
+    ["quote", network, gas, maxFeePerGas] as const,
+  torBalance: (network: NetworkId, address?: Address) => ["torBalance", network, address] as const,
+  nativeBalance: (network: NetworkId, address?: Address) =>
+    ["nativeBalance", network, address] as const,
+  position: (network: NetworkId, address?: Address) => ["position", network, address] as const,
 };

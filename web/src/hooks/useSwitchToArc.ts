@@ -3,15 +3,16 @@
 import { useMutation } from "@tanstack/react-query";
 import { useConfig } from "wagmi";
 import { switchChain } from "wagmi/actions";
-import { arcTestnet } from "@/lib/chain";
+import { useNetwork } from "./useNetwork";
 import type { MutationHookResult } from "./types";
 
-export function useSwitchToArcTestnet(): MutationHookResult<void> {
+export function useSwitchToArc(): MutationHookResult<void> {
   const config = useConfig();
+  const { network } = useNetwork();
 
   return useMutation({
     mutationFn: async () => {
-      await switchChain(config, { chainId: arcTestnet.id });
+      await switchChain(config, { chainId: network.chain.id });
     },
   });
 }
