@@ -1,16 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseAbiItem, type Address } from "viem";
 import { publicClient } from "./clients.ts";
 import { addresses } from "./contracts.ts";
+import { migrate, sql } from "./db.ts";
 import { scanLogChunks } from "./logScanner.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Scoped by chain id: running a testnet and a mainnet instance side by side (as the web app's
-// network switch expects) from the same server/ checkout must not have them clobber each other's
-// indexed state through one shared file.
-const STATE_FILE = join(__dirname, "..", `.indexer-state.${addresses.chainId}.json`);
+const CHAIN_ID = addresses.chainId;
 
 // How often watchEvent polls for new logs once caught up (viem has no WebSocket transport for
 // Arc, so "listening" is still eth_getLogs under the hood — just scoped to new blocks only,
@@ -37,74 +31,71 @@ type State = {
   lastScannedAt: number;
 };
 
-type StoredState = {
-  lastScannedBlock: string;
-  totalTorUsdcCharged: string;
-  userOperationCount: number;
-  positions: Record<string, { depositedTotal: string; withdrawnTotal: string }>;
-  lastScannedAt: number;
-};
+// Kept in memory as a read cache for getGasSponsoredStats/getPositionCostBasis (called on every
+// /stats and /position request) — Postgres is the durable copy, not the read path.
+async function loadState(): Promise<State> {
+  await migrate();
 
-function loadState(): State {
-  const initial: State = {
-    lastScannedBlock: BigInt(addresses.deployedAtBlock ?? 0),
-    totalTorUsdcCharged: 0n,
-    userOperationCount: 0,
-    positions: new Map(),
-    lastScannedAt: 0,
-  };
+  const [row] = await sql`
+    SELECT last_scanned_block, total_tor_usdc_charged, user_operation_count, last_scanned_at
+    FROM indexer_state WHERE chain_id = ${CHAIN_ID}
+  `;
 
-  try {
-    const raw = JSON.parse(readFileSync(STATE_FILE, "utf-8")) as StoredState;
-    return {
-      lastScannedBlock: BigInt(raw.lastScannedBlock),
-      totalTorUsdcCharged: BigInt(raw.totalTorUsdcCharged),
-      userOperationCount: raw.userOperationCount,
-      positions: new Map(
-        Object.entries(raw.positions).map(([owner, p]) => [
-          owner as Address,
-          { depositedTotal: BigInt(p.depositedTotal), withdrawnTotal: BigInt(p.withdrawnTotal) },
-        ])
-      ),
-      lastScannedAt: raw.lastScannedAt,
-    };
-    // Falls through to `initial` for a missing file (first run) or a corrupt/outdated one —
-    // either way the indexer just re-scans from the deployment block.
-  } catch {
-    return initial;
-  }
-}
+  const positionRows: { owner: string; deposited_total: string; withdrawn_total: string }[] = await sql`
+    SELECT owner, deposited_total, withdrawn_total FROM indexer_positions WHERE chain_id = ${CHAIN_ID}
+  `;
 
-function saveState(state: State) {
-  const stored: StoredState = {
-    lastScannedBlock: state.lastScannedBlock.toString(),
-    totalTorUsdcCharged: state.totalTorUsdcCharged.toString(),
-    userOperationCount: state.userOperationCount,
-    positions: Object.fromEntries(
-      [...state.positions.entries()].map(([owner, p]) => [
-        owner,
-        { depositedTotal: p.depositedTotal.toString(), withdrawnTotal: p.withdrawnTotal.toString() },
+  return {
+    lastScannedBlock: BigInt(row?.last_scanned_block ?? addresses.deployedAtBlock ?? 0),
+    totalTorUsdcCharged: BigInt(row?.total_tor_usdc_charged ?? 0),
+    userOperationCount: Number(row?.user_operation_count ?? 0),
+    positions: new Map(
+      positionRows.map((p) => [
+        p.owner as Address,
+        { depositedTotal: BigInt(p.deposited_total), withdrawnTotal: BigInt(p.withdrawn_total) },
       ])
     ),
-    lastScannedAt: state.lastScannedAt,
+    lastScannedAt: Number(row?.last_scanned_at ?? 0),
   };
-  writeFileSync(STATE_FILE, JSON.stringify(stored));
 }
 
-const state = loadState();
+const state = await loadState();
 
-function addPosition(owner: Address, key: keyof PositionEntry, amount: bigint) {
+async function persistState() {
+  await sql`
+    INSERT INTO indexer_state (chain_id, last_scanned_block, total_tor_usdc_charged, user_operation_count, last_scanned_at)
+    VALUES (
+      ${CHAIN_ID}, ${state.lastScannedBlock.toString()}, ${state.totalTorUsdcCharged.toString()},
+      ${state.userOperationCount}, ${state.lastScannedAt}
+    )
+    ON CONFLICT (chain_id) DO UPDATE SET
+      last_scanned_block = EXCLUDED.last_scanned_block,
+      total_tor_usdc_charged = EXCLUDED.total_tor_usdc_charged,
+      user_operation_count = EXCLUDED.user_operation_count,
+      last_scanned_at = EXCLUDED.last_scanned_at
+  `;
+}
+
+async function addPosition(owner: Address, key: keyof PositionEntry, amount: bigint) {
   const entry = state.positions.get(owner) ?? { depositedTotal: 0n, withdrawnTotal: 0n };
   entry[key] += amount;
   state.positions.set(owner, entry);
+
+  await sql`
+    INSERT INTO indexer_positions (chain_id, owner, deposited_total, withdrawn_total)
+    VALUES (${CHAIN_ID}, ${owner}, ${entry.depositedTotal.toString()}, ${entry.withdrawnTotal.toString()})
+    ON CONFLICT (chain_id, owner) DO UPDATE SET
+      deposited_total = EXCLUDED.deposited_total,
+      withdrawn_total = EXCLUDED.withdrawn_total
+  `;
 }
 
-function bumpSyncedAt(latestLogBlock?: bigint) {
+async function bumpSyncedAt(latestLogBlock?: bigint) {
   state.lastScannedAt = Date.now();
   if (latestLogBlock && latestLogBlock > state.lastScannedBlock) {
     state.lastScannedBlock = latestLogBlock;
   }
-  saveState(state);
+  await persistState();
 }
 
 /**
@@ -135,16 +126,16 @@ async function catchUp() {
         state.userOperationCount += 1;
         counts.sponsored += 1;
       } else if (log.eventName === "Deposit" && fromVault && log.args.owner) {
-        addPosition(log.args.owner, "depositedTotal", log.args.assets ?? 0n);
+        await addPosition(log.args.owner, "depositedTotal", log.args.assets ?? 0n);
         counts.deposits += 1;
       } else if (log.eventName === "Withdraw" && fromVault && log.args.owner) {
-        addPosition(log.args.owner, "withdrawnTotal", log.args.assets ?? 0n);
+        await addPosition(log.args.owner, "withdrawnTotal", log.args.assets ?? 0n);
         counts.withdrawals += 1;
       }
     }
     // Persisted per chunk, so a retry after a mid-scan failure resumes here instead of block 0.
     state.lastScannedBlock = toBlock;
-    bumpSyncedAt();
+    await bumpSyncedAt();
   }
 
   console.log(
@@ -166,13 +157,13 @@ function watch() {
     event: USER_OPERATION_SPONSORED_EVENT,
     pollingInterval: WATCH_POLLING_INTERVAL_MS,
     fromBlock,
-    onLogs: (logs) => {
+    onLogs: async (logs) => {
       if (logs.length === 0) return;
       logs.forEach((log) => {
         state.totalTorUsdcCharged += log.args.tokenAmount ?? 0n;
         state.userOperationCount += 1;
       });
-      bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
+      await bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
       console.log(`[indexer] +${logs.length} sponsored UserOperation(s)`);
     },
   });
@@ -182,12 +173,12 @@ function watch() {
     event: DEPOSIT_EVENT,
     pollingInterval: WATCH_POLLING_INTERVAL_MS,
     fromBlock,
-    onLogs: (logs) => {
+    onLogs: async (logs) => {
       if (logs.length === 0) return;
-      logs.forEach((log) => {
-        if (log.args.owner) addPosition(log.args.owner, "depositedTotal", log.args.assets ?? 0n);
-      });
-      bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
+      for (const log of logs) {
+        if (log.args.owner) await addPosition(log.args.owner, "depositedTotal", log.args.assets ?? 0n);
+      }
+      await bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
       console.log(`[indexer] +${logs.length} deposit(s)`);
     },
   });
@@ -197,12 +188,12 @@ function watch() {
     event: WITHDRAW_EVENT,
     pollingInterval: WATCH_POLLING_INTERVAL_MS,
     fromBlock,
-    onLogs: (logs) => {
+    onLogs: async (logs) => {
       if (logs.length === 0) return;
-      logs.forEach((log) => {
-        if (log.args.owner) addPosition(log.args.owner, "withdrawnTotal", log.args.assets ?? 0n);
-      });
-      bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
+      for (const log of logs) {
+        if (log.args.owner) await addPosition(log.args.owner, "withdrawnTotal", log.args.assets ?? 0n);
+      }
+      await bumpSyncedAt(logs.at(-1)?.blockNumber ?? undefined);
       console.log(`[indexer] +${logs.length} withdrawal(s)`);
     },
   });
