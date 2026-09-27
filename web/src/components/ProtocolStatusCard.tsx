@@ -7,7 +7,7 @@ export function ProtocolStatusCard() {
   const { network } = useNetwork();
 
   return (
-    <div className="relative mt-auto overflow-hidden rounded-3xl bg-surface p-4">
+    <div className="relative mt-auto overflow-hidden rounded-2xl bg-surface p-4">
       <div className="pointer-events-none absolute top-1/2 right-0 size-32 -translate-y-1/2 translate-x-1/3 rounded-full border border-foreground/10" />
       <div className="pointer-events-none absolute top-1/2 right-0 size-48 -translate-y-1/2 translate-x-1/3 rounded-full border border-foreground/[0.06]" />
       <div className="pointer-events-none absolute top-1/2 right-0 size-64 -translate-y-1/2 translate-x-1/3 rounded-full border border-foreground/[0.03]" />
