@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "dev:mainnet": "bun --env-file=.env.mainnet run --watch src/index.ts",
+    "start:mainnet": "bun --env-file=.env.mainnet run src/index.ts",
     "keeper": "bun run src/keeper.ts",
+    "keeper:mainnet": "bun --env-file=.env.mainnet run src/keeper.ts",
     "e2e": "bun run scripts/e2e.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -17,6 +17,9 @@ examples/gasless-demo/contracts/broadcast/*/dry-run/
 # --- Bun / Node (server/) ---
 server/node_modules/
 server/dist/
+# Regenerable indexer cache (server/src/indexer.ts) — rebuilt from chain events on next boot.
+# One file per chain id (testnet/mainnet instances run side by side from this same checkout).
+server/.indexer-state.*.json
 
 # --- Misc ---
 .DS_Store

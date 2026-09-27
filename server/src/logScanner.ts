@@ -5,28 +5,32 @@ import { publicClient } from "./clients.ts";
 // large") — chunk every scan through this one helper instead of re-deriving that limit elsewhere.
 const MAX_BLOCK_RANGE = 9_000n;
 
-export async function scanLogs<const event extends AbiEvent>(params: {
-  address: Address | Address[];
-  event: event;
-  args?: Record<string, unknown>;
-  fromBlock: bigint;
-}) {
-  const latest = await publicClient.getBlockNumber();
-  const logs = [];
+// Back-to-back requests trip Arc's public RPC rate limiter; spacing them keeps us under it.
+const CHUNK_DELAY_MS = 1_000;
 
-  for (let start = params.fromBlock; start <= latest; start += MAX_BLOCK_RANGE + 1n) {
-    const end = start + MAX_BLOCK_RANGE < latest ? start + MAX_BLOCK_RANGE : latest;
-    const chunk = await publicClient.getLogs({
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Yields one chunk of logs at a time (all `events`, all `address`es in a single request per
+ * chunk) so callers can persist progress as they go and resume after a failure.
+ */
+export async function* scanLogChunks<const events extends readonly AbiEvent[]>(params: {
+  address: Address | Address[];
+  events: events;
+  fromBlock: bigint;
+  toBlock: bigint;
+}) {
+  for (let start = params.fromBlock; start <= params.toBlock; start += MAX_BLOCK_RANGE + 1n) {
+    const end = start + MAX_BLOCK_RANGE < params.toBlock ? start + MAX_BLOCK_RANGE : params.toBlock;
+    const logs = await publicClient.getLogs({
       address: params.address,
-      event: params.event,
-      // This generic helper is intentionally shared across events with different indexed-arg
-      // shapes; viem's precise per-event `args` type can't be expressed for that here.
-      args: params.args as never,
+      events: params.events,
       fromBlock: start,
       toBlock: end,
     });
-    logs.push(...chunk);
+    yield { logs, toBlock: end };
+    if (end < params.toBlock) await sleep(CHUNK_DELAY_MS);
   }
-
-  return logs;
 }
