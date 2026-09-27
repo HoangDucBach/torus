@@ -55,7 +55,7 @@ refuel(): redeem collected torUSDC → native USDC → top up EntryPoint deposit
 contracts/    Arc Foundry project — TorusVault, TorusPaymaster, mocks, tests, deploy scripts
 server/       Bun + Hono service — ERC-7677 paymaster RPC, /quote, /stats, /position, keeper cron
 web/          Next.js + HeroUI dashboard — deposit, withdraw, real earnings, protocol stats
-examples/     Standalone integration demos for third-party protocols (see below)
+examples/     Third-party integration proofs — contracts here, demo UI lives at web's /gasless
 ```
 
 ## Contracts (`contracts/`)
@@ -196,10 +196,11 @@ or API key for this: the entire integration surface is the server's public
 
 `examples/gasless-demo` proves this end-to-end with a contract that has zero knowledge of
 Torus — `ExampleCounter.sol`, deployed separately on Arc Testnet — called gaslessly from a plain
-EOA via EIP-7702, sponsored entirely through Torus's paymaster. See
-[`examples/gasless-demo/README.md`](examples/gasless-demo/README.md). This is also where the
-"Gasless via EIP-7702" flow that used to live on the main dashboard moved to, since it's a proof
-for integrators, not a feature of the YBS product itself.
+EOA via EIP-7702, sponsored entirely through Torus's paymaster. The contract lives under
+`examples/gasless-demo/contracts`; the demo UI itself is `/gasless` in the main dashboard (see
+[`examples/gasless-demo/README.md`](examples/gasless-demo/README.md)) — it's a proof for
+integrators, not a feature of the YBS product itself, which is why it's a separate page rather
+than part of `/app`.
 
 ## Security notes
 
