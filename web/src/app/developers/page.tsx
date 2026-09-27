@@ -14,8 +14,8 @@ const paymaster = createPaymasterClient({
 
 export default function DevelopersPage() {
   return (
-    <Tabs defaultSelectedKey="sdk" orientation="vertical" variant="secondary">
-      <Tabs.ListContainer className="sticky top-0 z-10 bg-background">
+    <Tabs defaultSelectedKey="sdk" orientation="vertical">
+      <Tabs.ListContainer className="py-1">
         <Tabs.List aria-label="Developers sections">
           <Tabs.Tab id="sdk">
             SDK
