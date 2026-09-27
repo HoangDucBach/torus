@@ -24,3 +24,6 @@ pgdata/
 # --- Misc ---
 .DS_Store
 *.log
+
+# --- AWS ---
+torus.pem

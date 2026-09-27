@@ -6,7 +6,9 @@ services:
       POSTGRES_PASSWORD: torus
       POSTGRES_DB: torus
     ports:
-      - "5432:5432"
+      # Loopback-only — the server containers reach it over the internal docker network; nothing
+      # outside the host needs to.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,9 +17,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Testnet by default. For a mainnet instance, copy this service, swap the env_file to
-  # server/.env.production, and map port 8788:8788 instead (see server/.env.production).
-  server:
+  server-testnet:
     build:
       context: .
       dockerfile: server/Dockerfile
@@ -31,6 +31,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  server-mainnet:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    env_file:
+      - server/.env
+      - server/.env.production
+    environment:
+      DATABASE_URL: postgres://torus:torus@postgres:5432/torus
+    ports:
+      - "8788:8788"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:
