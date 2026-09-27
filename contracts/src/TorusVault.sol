@@ -146,7 +146,11 @@ contract TorusVault is ERC4626, ERC20Permit, AccessControl, ReentrancyGuardTrans
             _strategy.withdraw(assets - idle, address(this));
         }
         super._withdraw(caller, receiver, owner, assets, shares);
-        _totalAssetsCheckpoint -= assets;
+        // Saturating: `assets` can exceed the checkpoint when it includes yield not yet
+        // harvested — reverting here would lock the last redeemers' funds until someone
+        // calls harvest(). The unharvested portion simply goes fee-free.
+        uint256 checkpoint = _totalAssetsCheckpoint;
+        _totalAssetsCheckpoint = checkpoint > assets ? checkpoint - assets : 0;
     }
 
     // ---------------------------------------------------------------------

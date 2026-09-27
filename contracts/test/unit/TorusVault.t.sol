@@ -200,6 +200,31 @@ contract TorusVaultTest is Test {
 
         assertGt(vault.getRate(), 1e18);
     }
+
+    function test_redeemAll_withUnharvestedYield_doesNotRevert() public {
+        usdc.mint(user, 100e6);
+        vm.startPrank(user);
+        usdc.approve(address(vault), 100e6);
+        vault.deposit(100e6, user);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        vault.invest(100e6);
+
+        usdc.mint(address(this), 10e6);
+        usdc.approve(address(strategy), 10e6);
+        strategy.fundReserve(10e6);
+        vm.prank(admin);
+        oracle.setRate(1.1e18);
+        strategy.accrue();
+
+        uint256 shares = vault.balanceOf(user);
+        vm.prank(user);
+        uint256 assets = vault.redeem(shares, user, user);
+
+        assertGt(assets, 100e6, "user receives principal plus unharvested yield");
+        assertEq(vault.balanceOf(user), 0);
+    }
 }
 
 /// @dev Mirrors {ITorusVault}'s events so `vm.expectEmit` can reference them without importing
